@@ -1,0 +1,7 @@
+# Birthday Wisher Backend
+
+# Environment
+.env
+
+# Node
+node_modules/
