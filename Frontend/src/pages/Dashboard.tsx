@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
