@@ -37,6 +37,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     const res = await api.post('/auth/login', { email, password });
+
+    // Handle errors from backend
+    if (res.data.success === false) {
+      throw { response: { data: { message: res.data.message } } };
+    }
+
     if (res.data.requiresVerification) {
       return { requiresVerification: true, email: res.data.email };
     }
@@ -50,9 +56,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (name: string, email: string, password: string) => {
     const res = await api.post('/auth/signup', { name, email, password });
+    
+    // Handle errors from backend
+    if (res.data.success === false) {
+      throw { response: { data: { message: res.data.message } } };
+    }
+
+    // If verification is needed, do NOT set user state yet
     if (res.data.requiresVerification) {
       return { requiresVerification: true, email: res.data.email };
     }
+
+    // Otherwise, log them in immediately
     const { token: t, user: u } = res.data;
     setToken(t);
     setUser(u);

@@ -1,5 +1,7 @@
-// Services/otpEmailService.js - OTP email sender via Nodemailer
-import transporter from './mailer.js';
+// Services/otpEmailService.js - OTP email sender via Brevo HTTP API
+import axios from 'axios';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const OTP_EMAIL_TEMPLATES = {
   verify_email: {
@@ -88,25 +90,38 @@ const OTP_EMAIL_TEMPLATES = {
 };
 
 /**
- * Sends an OTP email via Nodemailer.
+ * Sends an OTP email via Brevo HTTP API.
  */
 const sendOtpEmail = async ({ toEmail, toName, otp, purpose }) => {
+  const BREVO_API_KEY = process.env.BREVO_API_KEY;
+
   try {
     const template = OTP_EMAIL_TEMPLATES[purpose];
     if (!template) throw new Error(`Unknown OTP purpose: ${purpose}`);
 
-    await transporter.sendMail({
-      from: `"Birthday Wisher 🎂" <${process.env.SMTP_USER}>`,
-      to: toEmail,
-      subject: template.subject,
-      html: template.buildHtml(otp),
-    });
+    const response = await axios.post(
+      'https://api.brevo.com/v3/smtp/email',
+      {
+        sender: { name: 'Birthday Wisher 🎂', email: process.env.SENDER_EMAIL },
+        to: [{ email: toEmail, name: toName || toEmail }],
+        subject: template.subject,
+        htmlContent: template.buildHtml(otp),
+      },
+      {
+        headers: {
+          'api-key': BREVO_API_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      }
+    );
 
-    console.log(`✅ OTP email [${purpose}] sent to ${toEmail}`);
+    console.log(`✅ OTP email [${purpose}] sent to ${toEmail} | MessageId: ${response.data.messageId}`);
     return { success: true };
   } catch (error) {
-    console.error(`❌ OTP email [${purpose}] failed for ${toEmail}:`, error.message);
-    return { success: false, error: error.message };
+    const errorMsg = error.response?.data?.message || error.message;
+    console.error(`❌ OTP email [${purpose}] failed for ${toEmail}:`, errorMsg);
+    return { success: false, error: errorMsg };
   }
 };
 

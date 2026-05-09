@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import User from '../Models/User.js';
 import Otp from '../Models/Otp.js';
 import sendOtpEmail from '../Services/otpEmailService.js';
+import sendBirthdayEmail from '../Services/emailService.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -26,48 +27,58 @@ const upsertOtp = async (email, rawOtp, purpose) => {
 };
 
 // ─── POST /auth/signup ───────────────────────────────────────────────────────
-// Creates account (unverified), sends email verification OTP
 router.post('/signup', async (req, res) => {
+  const { name, email, password } = req.body;
+  
+  if (!name || !email || !password) {
+    return res.json({ success: false, message: 'Missing details' });
+  }
+
   try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.json({ success: false, message: 'User Already exists' });
     }
 
-    const existing = await User.findOne({ email });
-    if (existing) {
-      if (existing.isVerified) {
-        return res.status(400).json({ success: false, message: 'Email already in use' });
-      }
-      // Account exists but not verified — allow re-signup by updating it
-      existing.name = name;
-      existing.password = await bcrypt.hash(password, 10);
-      await existing.save();
-    } else {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      await new User({ name, email, password: hashedPassword }).save();
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({ name, email, password: hashedPassword });
+    await user.save();
 
-    // Generate OTP, hash and upsert into Otp collection
+    // 7-day token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    // Set cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    // Send Welcome Email
+    await sendBirthdayEmail({
+      toEmail: email,
+      toName: name,
+      subject: 'Welcome to Birthday Wisher',
+      htmlContent: `<p>Hello ${name}, your account has been created successfully with ID: ${email}. Please check your email for a verification code to activate your account.</p>`
+    });
+
+    // Generate and send OTP for verification
     const rawOtp = generateOtp();
     await upsertOtp(email, rawOtp, 'verify_email');
-
-    // Send email (raw OTP only goes into email, never stored plaintext)
     await sendOtpEmail({ toEmail: email, toName: name, otp: rawOtp, purpose: 'verify_email' });
 
-    return res.status(201).json({
+    return res.json({
       success: true,
-      message: 'Account created. Check your email for the verification code.',
       requiresVerification: true,
       email,
+      user: { id: user._id, name: user.name, email: user.email },
+      token
     });
+
   } catch (error) {
-    console.error('Signup error:', error.message);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error('🔥 Signup Route Error:', error);
+    return res.json({ success: false, message: error.message });
   }
 });
 
