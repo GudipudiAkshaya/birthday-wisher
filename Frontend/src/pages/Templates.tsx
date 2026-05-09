@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface Template {
   _id: string;
@@ -43,6 +44,7 @@ const Templates: React.FC = () => {
   const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['templates'],
@@ -89,14 +91,18 @@ const Templates: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete template "${name}"?`)) return;
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    setLoading(true);
     try {
-      await api.delete(`/templates/${id}`);
+      await api.delete(`/templates/${deleteConfirm.id}`);
       toast.success('Template deleted');
       qc.invalidateQueries({ queryKey: ['templates'] });
+      setDeleteConfirm(null);
     } catch {
       toast.error('Failed to delete');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -143,7 +149,7 @@ const Templates: React.FC = () => {
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setPreviewId(previewId === t._id ? null : t._id)}>👁️</button>
                     <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openEdit(t)}>✏️</button>
-                    <button className="btn btn-danger btn-sm btn-icon" onClick={() => handleDelete(t._id, t.name)}>🗑️</button>
+                    <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleteConfirm({ id: t._id, name: t.name })}>🗑️</button>
                   </div>
                 </div>
                 {previewId === t._id && (
@@ -194,6 +200,17 @@ const Templates: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        title="Delete Template"
+        message={`Are you sure you want to delete the template "${deleteConfirm?.name}"? Any active birthday schedules using this template will stop working.`}
+        confirmLabel="Delete Template"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirm(null)}
+        isLoading={loading}
+        variant="danger"
+      />
     </>
   );
 };

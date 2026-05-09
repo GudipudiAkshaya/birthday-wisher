@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface Friend {
   _id: string;
@@ -20,6 +21,7 @@ const Friends: React.FC = () => {
   const [editing, setEditing] = useState<Friend | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['friends'],
@@ -70,15 +72,19 @@ const Friends: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete ${name}? Any scheduled wishes will also be removed.`)) return;
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    setLoading(true);
     try {
-      await api.delete(`/friends/${id}`);
+      await api.delete(`/friends/${deleteConfirm.id}`);
       toast.success('Friend deleted');
       qc.invalidateQueries({ queryKey: ['friends'] });
       qc.invalidateQueries({ queryKey: ['schedules'] });
+      setDeleteConfirm(null);
     } catch {
       toast.error('Failed to delete');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -135,7 +141,7 @@ const Friends: React.FC = () => {
                 <div className="item-row-actions">
                   <span className="badge badge-purple">{getBirthdayLabel(f.birthday)}</span>
                   <button className="btn btn-ghost btn-sm btn-icon" title="Edit" onClick={() => openEdit(f)}>✏️</button>
-                  <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => handleDelete(f._id, f.name)}>🗑️</button>
+                  <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => setDeleteConfirm({ id: f._id, name: f.name })}>🗑️</button>
                 </div>
               </div>
             ))}
@@ -171,6 +177,17 @@ const Friends: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        title="Delete Friend"
+        message={`Are you sure you want to delete ${deleteConfirm?.name}? This will also remove any active birthday schedules for them.`}
+        confirmLabel="Delete Friend"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirm(null)}
+        isLoading={loading}
+        variant="danger"
+      />
     </>
   );
 };

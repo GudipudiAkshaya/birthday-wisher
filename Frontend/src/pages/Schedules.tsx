@@ -5,6 +5,7 @@ import api from '../lib/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface Schedule {
   _id: string;
@@ -21,6 +22,7 @@ const Schedules: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ friendId: '', templateId: '', sendTime: '08:00' });
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: schedulesData, isLoading } = useQuery({
     queryKey: ['schedules'],
@@ -71,14 +73,18 @@ const Schedules: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this schedule?')) return;
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setLoading(true);
     try {
-      await api.delete(`/schedules/${id}`);
+      await api.delete(`/schedules/${deleteId}`);
       toast.success('Schedule deleted');
       qc.invalidateQueries({ queryKey: ['schedules'] });
+      setDeleteId(null);
     } catch {
       toast.error('Failed to delete');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -160,7 +166,7 @@ const Schedules: React.FC = () => {
                     title={s.active ? 'Pause schedule' : 'Activate schedule'}
                     onClick={() => handleToggle(s._id, s.active)}
                   />
-                  <button className="btn btn-danger btn-sm btn-icon" onClick={() => handleDelete(s._id)}>🗑️</button>
+                  <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleteId(s._id)}>🗑️</button>
                 </div>
               </div>
             ))}
@@ -251,6 +257,17 @@ const Schedules: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deleteId}
+        title="Delete Schedule"
+        message="Are you sure you want to delete this birthday schedule? You can always recreate it later."
+        confirmLabel="Delete Schedule"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+        isLoading={loading}
+        variant="danger"
+      />
     </>
   );
 };
