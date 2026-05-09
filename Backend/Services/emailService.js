@@ -1,9 +1,7 @@
-// Services/emailService.js - Birthday email sender via Nodemailer
-import transporter from './mailer.js';
+// Services/emailService.js - Birthday email sender via Resend HTTP API
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 dotenv.config();
-
-const SENDER = `"Birthday Wisher 🎂" <${process.env.SMTP_USER}>`;
 
 /**
  * Sends the birthday HTML email to a friend.
@@ -13,15 +11,25 @@ const SENDER = `"Birthday Wisher 🎂" <${process.env.SMTP_USER}>`;
  * @param {string} htmlContent
  */
 const sendBirthdayEmail = async ({ toEmail, toName, subject, htmlContent }) => {
+  // Initialize INSIDE function to ensure process.env.RESEND_API_KEY is ready
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   try {
-    const info = await transporter.sendMail({
-      from: SENDER,
-      to: `"${toName}" <${toEmail}>`,
-      subject,
+    const { data, error } = await resend.emails.send({
+      // IMPORTANT: In Resend Free Tier (unverified domain), you MUST use onboarding@resend.dev
+      from: 'Birthday Wisher 🎂 <onboarding@resend.dev>',
+      to: toEmail,
+      subject: subject,
       html: htmlContent,
     });
-    console.log(`✅ Birthday email sent to ${toEmail} | MessageId: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+
+    if (error) {
+      console.error(`❌ Resend error for ${toEmail}:`, error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`✅ Birthday email sent to ${toEmail} | Id: ${data.id}`);
+    return { success: true, messageId: data.id };
   } catch (error) {
     console.error(`❌ Failed to send birthday email to ${toEmail}:`, error.message);
     return { success: false, error: error.message };

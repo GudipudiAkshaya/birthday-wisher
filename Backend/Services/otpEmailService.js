@@ -1,9 +1,7 @@
-// Services/otpEmailService.js - OTP email sender via Nodemailer for auth flows
-import transporter from './mailer.js';
+// Services/otpEmailService.js - OTP email sender via Resend HTTP API
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 dotenv.config();
-
-const SENDER = `"Birthday Wisher 🎂" <${process.env.SMTP_USER}>`;
 
 const OTP_EMAIL_TEMPLATES = {
   verify_email: {
@@ -92,25 +90,33 @@ const OTP_EMAIL_TEMPLATES = {
 };
 
 /**
- * Sends an OTP email via Nodemailer.
+ * Sends an OTP email via Resend SDK.
  * @param {string} toEmail
  * @param {string} toName
- * @param {string} otp        - Raw 6-digit OTP (plain text — only sent in email, never stored)
+ * @param {string} otp
  * @param {'verify_email'|'forgot_password'} purpose
  */
 const sendOtpEmail = async ({ toEmail, toName, otp, purpose }) => {
+  // Initialize INSIDE function to ensure process.env.RESEND_API_KEY is ready
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  
   try {
     const template = OTP_EMAIL_TEMPLATES[purpose];
     if (!template) throw new Error(`Unknown OTP purpose: ${purpose}`);
 
-    const info = await transporter.sendMail({
-      from: SENDER,
-      to: `"${toName || toEmail}" <${toEmail}>`,
+    const { data, error } = await resend.emails.send({
+      from: 'Birthday Wisher 🎂 <onboarding@resend.dev>',
+      to: toEmail,
       subject: template.subject,
       html: template.buildHtml(otp),
     });
 
-    console.log(`✅ OTP email [${purpose}] sent to ${toEmail} | MessageId: ${info.messageId}`);
+    if (error) {
+      console.error(`❌ Resend OTP error for ${toEmail}:`, error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`✅ OTP email [${purpose}] sent to ${toEmail} | Id: ${data.id}`);
     return { success: true };
   } catch (error) {
     console.error(`❌ OTP email [${purpose}] failed for ${toEmail}:`, error.message);

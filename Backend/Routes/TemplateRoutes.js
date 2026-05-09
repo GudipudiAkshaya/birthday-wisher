@@ -39,7 +39,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const template = await Template.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
       { name, subject, message },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
     return res.status(200).json({ success: true, message: 'Template updated', template });

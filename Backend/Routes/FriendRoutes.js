@@ -40,7 +40,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const friend = await Friend.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
       { name, email, birthday },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!friend) return res.status(404).json({ success: false, message: 'Friend not found' });
     return res.status(200).json({ success: true, message: 'Friend updated', friend });

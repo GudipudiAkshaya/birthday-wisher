@@ -21,7 +21,7 @@ const upsertOtp = async (email, rawOtp, purpose) => {
   await Otp.findOneAndUpdate(
     { email, purpose },
     { hashedCode, createdAt: new Date() },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   );
 };
 
@@ -94,7 +94,7 @@ router.post('/verify-email', async (req, res) => {
     const user = await User.findOneAndUpdate(
       { email },
       { isVerified: true },
-      { new: true }
+      { returnDocument: 'after' }
     );
     await Otp.deleteOne({ email, purpose: 'verify_email' });
 

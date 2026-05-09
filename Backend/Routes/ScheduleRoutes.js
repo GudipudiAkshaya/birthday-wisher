@@ -73,7 +73,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const schedule = await Schedule.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
       { sendTime },
-      { new: true }
+      { returnDocument: 'after' }
     )
       .populate('friendId', 'name email birthday')
       .populate('templateId', 'name subject');
